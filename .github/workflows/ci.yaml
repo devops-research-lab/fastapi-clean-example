@@ -1,66 +1,56 @@
 name: CI
-
-on: [ push, pull_request ]
-
+on:
+  push: null
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.12.0
+    - name: Install UV and dependencies
+      run: 'python -m pip install --upgrade pip
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.12.0
+        python -m pip install uv==0.5.7
 
-      - name: Install UV and dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install uv==0.5.7
-          uv pip install -e '.[dev,test]' --system
+        uv pip install -e ''.[test,dev]'' --system
 
-      - name: Format code
-        run: |
-          ruff format
+        '
+    - name: Format code
+      run: 'isort src/
 
-      - name: Lint code
-        run: |
-          ruff check --exit-non-zero-on-fix
-          mypy
+        black src/
 
-      - name: Test code
-        run: |
-          pytest -v
+        '
+    - name: Lint code
+      run: 'bandit -r src/ -c pyproject.toml
 
-      - name: Test Docker Compose setup
-        run: |
-          export APP_ENV=local
-          python config/toml_config_manager.py
-          cd config/local
-          echo "Generated .env.local content:"
-          cat .env.local
-          export COMPOSE_ENV_FILES=.env.local
-          docker compose up -d --build
+        ruff check src/
 
-      - name: Verify Application Health
-        run: |
-          timeout 10s bash -c '
-            while ! curl -sf http://0.0.0.0:9999/api/v1/; do
-              sleep 1
-            done
-          '
+        pylint src/
 
-      - name: Test Signup Handler
-        run: |
-          timeout 10s bash -c "
-            while ! curl -sf -X POST \
-              'http://0.0.0.0:9999/api/v1/account/signup' \
-              -H 'accept: application/json' \
-              -H 'Content-Type: application/json' \
-              -d '{
-              \"username\": \"string\",
-              \"password\": \"string\"
-            }'; do
-              sleep 1
-            done
-          "
+        mypy src/
+
+        '
+    - name: Test code
+      run: 'pytest -v
+
+        '
+    - name: Generate Docker environment file
+      run: 'make dotenv-docker
+
+        '
+    - name: Build and run Docker compose
+      run: 'docker compose up -d --build
+
+        '
+    - name: Verify Application Health
+      run: "timeout 10s bash -c '\n  while ! curl -sf http://0.0.0.0:9999/api/v1/; do\n    sleep 1\n \
+        \ done\n'\n"
+    - name: Test Signup Handler
+      run: "timeout 10s bash -c \"\n  while ! curl -sf -X POST \\\n    'http://0.0.0.0:9999/api/v1/account/signup'\
+        \ \\\n    -H 'accept: application/json' \\\n    -H 'Content-Type: application/json' \\\n    -d\
+        \ '{\n    \\\"username\\\": \\\"string\\\",\n    \\\"password\\\": \\\"string\\\"\n  }'; do\n\
+        \    sleep 1\n  done\n\"\n"
